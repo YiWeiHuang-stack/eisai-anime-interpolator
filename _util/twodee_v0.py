@@ -56,7 +56,7 @@ class I:
         elif isinstance(data, bytes):
             data = uri2img(data)
         self.data = data
-        
+
         # massage to canonical forms
         if isinstance(self.data, Image.Image):
             # canon: pil image
@@ -174,10 +174,7 @@ class I:
         return self.uint8(ch_last=True)[...,::-1]
     def bgr(self):
         x = self.np()
-        if self.mode=='RGBA':
-            return I(x[[2,1,0,3]])
-        else:
-            return I(x[::-1])
+        return I(x[[2,1,0,3]]) if self.mode=='RGBA' else I(x[::-1])
     def tensor(self):
         if self.dtype=='pil':
             return F.to_tensor(self.data)
@@ -339,12 +336,9 @@ class I:
         b = I(img).pil().convert('RGBA')
         if opacity==0:
             return I(a)
-        # elif opacity==1:
-        #     return I(b)
-        else:
-            b = I(b).np() * np.asarray([1,1,1,opacity])[:,None,None]
-            b = I(b).pil()
-            return I(Image.alpha_composite(a,b))
+        b = I(b).np() * np.asarray([1,1,1,opacity])[:,None,None]
+        b = I(b).pil()
+        return I(Image.alpha_composite(a,b))
     def alpha_bg(self, c=0.5):
         return iblank(self.size, c=c).alpha_composite(self, opacity=1.0)
     def alpha_bbox(self, thresh=0.5):
@@ -475,7 +469,7 @@ def timg(x):
 
 # resizing
 def pixel_rounder(n, mode):
-    if mode==True or mode=='round':
+    if mode in [True, 'round']:
         return round(n)
     elif mode=='ceil':
         return math.ceil(n)
@@ -486,11 +480,12 @@ def pixel_rounder(n, mode):
 def pixel_ij(x, rounding=True):
     if isinstance(x, np.ndarray):
         x = x.tolist()
-    return tuple(pixel_rounder(i, rounding) for i in (
-        x if isinstance(x, tuple) or isinstance(x, list) else (x,x)
-    ))
+    return tuple(
+        pixel_rounder(i, rounding)
+        for i in (x if isinstance(x, (tuple, list)) else (x, x))
+    )
 def diam(x):
-    if isinstance(x, tuple) or isinstance(x, list):
+    if isinstance(x, (tuple, list)):
         h,w = x[-2:]
     elif isinstance(x, I):
         h,w = x.size
@@ -500,13 +495,13 @@ def diam(x):
 def rescale(x, factor, resample='bilinear', antialias=False):
     return x.rescale(factor, resample=resample, antialias=antialias)
 def rescale_dry(x, factor):
-    h,w = x[-2:] if isinstance(x, tuple) or isinstance(x, list) else I(x).size
+    h,w = x[-2:] if isinstance(x, (tuple, list)) else I(x).size
     return (h*factor, w*factor)
 def resize_max(x, s=512, resample='bilinear', antialias=False):
     return I(x).resize_max(s=s, resample=resample, antialias=antialias)
 def resize_max_dry(x, s=512):
     # returns size
-    h,w = x[-2:] if isinstance(x, tuple) or isinstance(x, list) else I(x).size
+    h,w = x[-2:] if isinstance(x, (tuple, list)) else I(x).size
     return (
         (s, int(w*s/h)),
         (int(h*s/w), s),
@@ -515,7 +510,7 @@ def resize_min(x, s=512, resample='bilinear', antialias=False):
     return I(x).resize_min(s=s, resample=resample, antialias=antialias)
 def resize_min_dry(x, s=512):
     # returns size
-    h,w = x[-2:] if isinstance(x, tuple) or isinstance(x, list) else I(x).size
+    h,w = x[-2:] if isinstance(x, (tuple, list)) else I(x).size
     return (
         (s, int(w*s/h)),
         (int(h*s/w), s),
@@ -531,7 +526,7 @@ def resize_square(
     )
 def resize_square_dry(x, s=512):
     # returns a forward cropbox
-    h,w = x[-2:] if isinstance(x, tuple) or isinstance(x, list) else I(x).size
+    h,w = x[-2:] if isinstance(x, (tuple, list)) else I(x).size
     from_corner = (
         (0, -(h-w)//2),
         (-(w-h)//2, 0),
@@ -646,21 +641,20 @@ def bbox_lim(bbox, xlim=None, ylim=None, blim=None):
         assert xlim is None and ylim is None
         (x,y),(h,w) = blim
         return bbox_lim(bbox, xlim=(x,x+h), ylim=(y,y+w))
-        
-    # x or y-range limits
+
     else:
         assert xlim is not None or ylim is not None
         (a,b),(h,w) = bbox
         u,v = a+h, b+w
         if xlim is not None:
-            if isinstance(xlim, tuple) or isinstance(xlim, list):
+            if isinstance(xlim, (tuple, list)):
                 x0,x1 = xlim
             else:
                 x0 = x1 = xlim
             a = np.clip(a, a_min=x0, a_max=x1)
             u = np.clip(u, a_min=x0, a_max=x1)
         if ylim is not None:
-            if isinstance(ylim, tuple) or isinstance(ylim, list):
+            if isinstance(ylim, (tuple, list)):
                 y0,y1 = ylim
             else:
                 y0 = y1 = ylim
@@ -685,7 +679,7 @@ def c255(c):
             'y': (1,1,0),
             'a': (0,0,0,0),
         }[c]
-    if isinstance(c, list) or isinstance(c, tuple):
+    if isinstance(c, (list, tuple)):
         if len(c)==3:
             c = c + (1,)
         elif len(c)==1:
@@ -721,7 +715,7 @@ def alpha_bg(x, c=0.5):
 def alpha_bbox(img, thresh=0.5):
     h,w = img.size
     rgba = img.np()
-    assert len(rgba) in [1,4]
+    assert len(rgba) in {1, 4}
     a = rgba[-1]
     x = np.max(a, axis=1)>thresh
     y = np.max(a, axis=0)>thresh
@@ -736,12 +730,9 @@ def igrid(imgs, just=True, bg='k'):
     # repackage
     assert isinstance(imgs, list)
     if any(isinstance(i, list) for i in imgs):
-        x = [
-            [j for j in i] if isinstance(i, list) else [i,]
-            for i in imgs
-        ]
+        x = [list(i) if isinstance(i, list) else [i,] for i in imgs]
     else:
-        x = [[i for i in imgs],]
+        x = [list(imgs)]
 
     # get sizes
     nrows = len(x)
@@ -849,7 +840,7 @@ def itext(
         align = 'right'
     else:
         assert False, 'pos not understood'
-    
+
     ans = Image.new('RGBA', (w,h), bg)
     d = PIL.ImageDraw.Draw(ans)
     d.multiline_text(

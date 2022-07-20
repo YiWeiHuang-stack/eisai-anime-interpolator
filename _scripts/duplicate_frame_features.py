@@ -57,7 +57,7 @@ vr0 = VideoReaderDALISeq(
 for x in vr0:
     prev = x['images']
 del vr0
-    
+
 # process video
 vr = VideoReaderDALISeq(
     fn_video,

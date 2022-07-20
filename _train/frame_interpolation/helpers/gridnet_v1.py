@@ -13,15 +13,21 @@ class Gridnet(nn.Module):
         self.channels_2 = ch2 = channels_2
         self.total_dropout_p = p = total_dropout_p
         self.depth = depth
-        self.encoders = nn.ModuleList([GridnetEncoder(ch0,ch1,ch2) for i in range(self.depth)])
-        self.decoders = nn.ModuleList([GridnetDecoder(ch0,ch1,ch2) for i in range(self.depth)])
+        self.encoders = nn.ModuleList(
+            [GridnetEncoder(ch0, ch1, ch2) for _ in range(self.depth)]
+        )
+
+        self.decoders = nn.ModuleList(
+            [GridnetDecoder(ch0, ch1, ch2) for _ in range(self.depth)]
+        )
+
         self.total_dropout = GridnetTotalDropout(p)
         return
     def forward(self, x):
         for e,enc in enumerate(self.encoders):
             t = [self.total_dropout(i) for i in t] if e!=0 else x
             t = enc(t)
-        for d,dec in enumerate(self.decoders):
+        for dec in self.decoders:
             t = [self.total_dropout(i) for i in t]
             t = dec(t)
         return t
@@ -139,16 +145,14 @@ class GridnetTotalDropout(nn.Module):
         d = (1-d.float()).to(x.device) * self.weight
         return d
     def forward(self, x, force_drop=None):
-        if force_drop is True:
-            ans = x * self.get_drop(x)
-        elif force_drop is False:
-            ans = x
-        else:
-            if self.training:
-                ans = x * self.get_drop(x)
-            else:
-                ans = x
-        return ans
+        return (
+            x * self.get_drop(x)
+            if force_drop is not True
+            and force_drop is not False
+            and self.training
+            or force_drop is True
+            else x
+        )
 
 
 

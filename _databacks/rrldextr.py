@@ -9,8 +9,9 @@ class DatabackendRRLDExtracted:
     def __init__(self, path):
         self.path = path
         bns = set(os.listdir(f'{self.path}/images')).intersection(
-            set([fn.split('.')[0] for fn in os.listdir(f'{self.path}/flows')])
+            {fn.split('.')[0] for fn in os.listdir(f'{self.path}/flows')}
         )
+
         bns = sorted(list(bns))
         self.bns = np.array(bns, dtype=np.string_)
         return

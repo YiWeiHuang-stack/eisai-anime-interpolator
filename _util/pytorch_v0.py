@@ -213,8 +213,7 @@ class LPIPSLoss(nn.Module):
         self.model = lpips.LPIPS(net=self.net_type, **kwargs)
         return
     def forward(self, preds: torch.Tensor, target: torch.Tensor):
-        ans = self.model(preds, target).mean((1,2,3))
-        return ans
+        return self.model(preds, target).mean((1,2,3))
 
 class LaplacianPyramidLoss(nn.Module):
     def __init__(self, n_levels=3, colorspace=None, mode='l1'):
@@ -228,10 +227,10 @@ class LaplacianPyramidLoss(nn.Module):
         if self.colorspace=='lab':
             preds = kornia.color.rgb_to_lab(preds.float())
             target = kornia.color.rgb_to_lab(target.float())
-        lvls = self.n_levels if force_levels==None else force_levels
+        lvls = self.n_levels if force_levels is None else force_levels
         preds = kornia.geometry.transform.build_pyramid(preds, lvls)
         target = kornia.geometry.transform.build_pyramid(target, lvls)
-        mode = self.mode if force_mode==None else force_mode
+        mode = self.mode if force_mode is None else force_mode
         if mode=='l1':
             ans = torch.stack([
                 (p-t).abs().mean((1,2,3))
