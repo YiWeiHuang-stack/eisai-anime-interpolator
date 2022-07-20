@@ -110,10 +110,7 @@ def read_filter(fn, cast=None, sort=True, sort_key=None):
         for line in read(fn).split('\n')
         if line!=''
     ]
-    if sort:
-        return sorted(ans, key=sort_key)
-    else:
-        return ans
+    return sorted(ans, key=sort_key) if sort else ans
 
 
 ################ FILE MANAGEMENT ################
@@ -124,7 +121,7 @@ def mkfile(fn, parents=True, exist_ok=True):
     return fn
 def mkdir(dn, parents=True, exist_ok=True):
     pathlib.Path(dn).mkdir(parents=parents, exist_ok=exist_ok)
-    return dn if (not dn[-1]=='/' or dn=='/') else dn[:-1]
+    return dn if dn[-1] != '/' or dn=='/' else dn[:-1]
 def fstrip(fn, return_more=False):
     dspl = fn.split('/')
     dn = '/'.join(dspl[:-1]) if len(dspl)>1 else '.'
@@ -269,8 +266,8 @@ class Table:
         for i in range(totalrows):
             for j in range(totalcols):
                 x,s = t[i][j]
-                sp = s[11]
-                if sp: x = eval(f'f"{{{x}{sp}}}"')
+                if sp := s[11]:
+                    x = eval(f'f"{{{x}{sp}}}"')
                 Table._put((str(x),s), t, (i,j), empty)
 
         # expand delimiters
@@ -283,7 +280,7 @@ class Table:
                 # expand delim_up(^)
                 if s_own[3]:
                     u,v = i,j
-                    while 0<=u:
+                    while u >= 0:
                         _,s = t[u][v]
                         if (i,j)!=(u,v) and (s[2] and not s[10]): break
                         Table._put((x, _repl(s)), t, (u,v), empty)
@@ -310,7 +307,7 @@ class Table:
                 # expand delim_left(<)
                 if s_own[6]:
                     u,v = i,j
-                    while 0<=v:
+                    while v >= 0:
                         _,s = t[u][v]
                         if (i,j)!=(u,v) and (s[2] and not s[10]): break
                         Table._put((x, _repl(s)), t, (u,v), empty)
@@ -362,7 +359,7 @@ class Table:
 
                 # justify vertically
                 plus = [' '*w,]*(h-len(x))
-                x = plus+x if not s[1] else x+plus
+                x = x+plus if s[1] else plus+x
 
                 # input to table
                 for r,xline in enumerate(x):
@@ -373,42 +370,37 @@ class Table:
         return '\n'.join([''.join(r) for r in rend])
 
     # parsing
-    def _spec(s, transpose=False):
-        if ':' in s:
-            i = s.index(':')
-            sp = s[i:]
-            s = s[:i]
+    def _spec(self, transpose=False):
+        if ':' in self:
+            i = self.index(':')
+            sp = self[i:]
+            self = self[:i]
         else:
             sp = ''
-            s = s.lower()
+            self = self.lower()
         return (
-            int('r' in s),                                      #  0:: 0:left(l)   1:right(r)
-            int('t' in s),                                      #  1:: 0:bottom(b) 1:top(t)
-            int(any([i in s for i in ['.','<','>','^','v']])),  #  2:: delim_here(.)
-            int('^' in s if not transpose else '<' in s),       #  3:: delim_up(^)
-            int('v' in s if not transpose else '>' in s),       #  4:: delim_down(v)
-            int('>' in s if not transpose else 'v' in s),       #  5:: delim_right(>)
-            int('<' in s if not transpose else '^' in s),       #  6:: delim_left(<)
-            int('+' in s),                                      #  7:: subtable(+)
-            int('-' in s if not transpose else '|' in s),       #  8:: subtable_horiz(-)
-            int('|' in s if not transpose else '-' in s),       #  9:: subtable_vert(|)
-            int('_' in s),                                      # 10:: fill(_); if delim, overwrite; else fit
-            sp,                                                 # 11:: special(:) f-string for numbers
+            int('r' in self),
+            int('t' in self),
+            int(any(i in self for i in ['.', '<', '>', '^', 'v'])),
+            int('<' in self if transpose else '^' in self),
+            int('>' in self if transpose else 'v' in self),
+            int('v' in self if transpose else '>' in self),
+            int('^' in self if transpose else '<' in self),
+            int('+' in self),
+            int('|' in self if transpose else '-' in self),
+            int('-' in self if transpose else '|' in self),
+            int('_' in self),
+            sp,
         )
-    def _put(obj, t, ij, empty):
+    def _put(self, t, ij, empty):
         i,j = ij
         while i>=len(t):
             t.append([])
         while j>=len(t[i]):
             t[i].append(empty)
-        t[i][j] = obj
+        t[i][j] = self
         return
-    def parse(
-            table,
-            delimiter=' ',
-            orientation='br',
-            double_colon=True,
-                ):
+    def parse(self, delimiter=' ', orientation='br', double_colon=True):
         # disabling transpose
         transpose = False
 
@@ -417,9 +409,9 @@ class Table:
 
         # transpose
         t = []
-        for i,row in enumerate(table):
+        for i,row in enumerate(self):
             for j,item in enumerate(row):
-                ij = (i,j) if not transpose else (j,i)
+                ij = (j, i) if transpose else (i, j)
                 if type(item)==tuple and len(item)==2 and type(item[1])==str:
                     item = (item[0], Table._spec(item[1], transpose))
                 elif double_colon and type(item)==str and '::' in item:
@@ -453,7 +445,7 @@ class Table:
         totalrows = maxrow
         t += [[]]*(totalrows-len(t))
         newt = []
-        delim = (delimiter, Table._spec('._'+orientation, transpose))
+        delim = delimiter, Table._spec(f'._{orientation}', transpose)
         for i,row in enumerate(t):
             wasd = False
             tcount = 0
@@ -463,15 +455,15 @@ class Table:
                 if wasd and isd:
                     Table._put(empty, newt, (i,j), empty)
                     wasd = False
-                elif wasd and not isd:
+                elif wasd:
                     Table._put(item, newt, (i,j), empty)
                     tcount += 1
                     wasd = False
-                elif not wasd and isd:
+                elif isd:
                     Table._put(item, newt, (i,j), empty)
                     tcount += 1
                     wasd = True
-                elif not wasd and not isd:
+                else:
                     Table._put(delim, newt, (i,j), empty)
                     wasd = True
         t = newt
@@ -510,8 +502,8 @@ class Table:
             if k==7: # 2d table
                 for x,row in enumerate(st):
                     for y,obj in enumerate(row):
-                        a = i+x if not transpose else i+y
-                        b = j+2*y if not transpose else j+2*x
+                        a = i+y if transpose else i+x
+                        b = j+2*x if transpose else j+2*y
                         Table._put((obj, s), t, (a,b), None)
             if k==8: # subtable_horiz
                 for y,obj in enumerate(st):

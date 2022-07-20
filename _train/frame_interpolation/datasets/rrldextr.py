@@ -54,7 +54,7 @@ class Dataset(torch.utils.data.Dataset):
                 imgs = imgs.flip(dims=(0,))
                 if use_flow:
                     flows = flows.flip(dims=(0,))
-        
+
         # package
         ans = {
             'bn': bn,
@@ -81,34 +81,37 @@ class Datamodule(pl.LightningDataModule):
             self.dk,
             False,
         )
-        dl = torch.utils.data.DataLoader(
-            ds, batch_size=self.bs,
-            shuffle=True, num_workers=self.num_workers,
+        return torch.utils.data.DataLoader(
+            ds,
+            batch_size=self.bs,
+            shuffle=True,
+            num_workers=self.num_workers,
             drop_last=False,
         )
-        return dl
     def val_dataloader(self):
         ds = Dataset(
             self.dk,
             True,
         )
-        dl = torch.utils.data.DataLoader(
-            ds, batch_size=self.bs,
-            shuffle=False, num_workers=self.num_workers,
+        return torch.utils.data.DataLoader(
+            ds,
+            batch_size=self.bs,
+            shuffle=False,
+            num_workers=self.num_workers,
             drop_last=False,
         )
-        return dl
     def test_dataloader(self):
         ds = Dataset(
             self.dk,
             True,
         )
-        dl = torch.utils.data.DataLoader(
-            ds, batch_size=self.bs,
-            shuffle=False, num_workers=self.num_workers,
+        return torch.utils.data.DataLoader(
+            ds,
+            batch_size=self.bs,
+            shuffle=False,
+            num_workers=self.num_workers,
             drop_last=False,
         )
-        return dl
 
 
 

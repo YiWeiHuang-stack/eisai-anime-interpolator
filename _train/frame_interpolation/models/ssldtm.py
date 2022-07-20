@@ -114,9 +114,8 @@ class HalfWarper(nn.Module):
     def morph_open(self, x, k):
         if k==0:
             return x
-        else:
-            with torch.no_grad():
-                return kornia.morphology.open(x, torch.ones(k,k,device=x.device))
+        with torch.no_grad():
+            return kornia.morphology.open(x, torch.ones(k,k,device=x.device))
     def forward(self, img0, img1, flow0, flow1, z0, z1, k, t=0.5, return_more=False):
         # forewarps
         flow0_ = (1-t) * flow0
@@ -192,14 +191,13 @@ class ResnetFeatureExtractor(nn.Module):
         ]
         return
     def forward(self, x, force_sizes_out=False, return_more=False):
-        ans = []
         x = x[:,:3]
         x = self.resize(x)
         x = self.resnet_preprocess(x)
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
-        ans.append(x)  # conv1
+        ans = [x]
         x = self.maxpool(x)
         x = self.layer1(x)
         ans.append(x)  # layer1

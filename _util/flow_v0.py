@@ -177,7 +177,7 @@ def cv2flow(a, b, method='lucaskanade', back=False):
 
 def flownet2(img_a, img_b, mode='shm', back=False):
     # package
-    url = f'http://localhost:8109/get-flow'
+    url = 'http://localhost:8109/get-flow'
     if mode=='shm':
         t = time.time()
         fn_a = img_a.save(mkfile(f'/dev/shm/_flownet2/{t}/img_a.png'))
@@ -193,7 +193,7 @@ def flownet2(img_a, img_b, mode='shm', back=False):
         'back': back,
         # 'vis': vis,
     })
-    
+
     # return
     ans = {'response': resp}
     if resp.status_code==200:

@@ -2,9 +2,14 @@
 
 
 from _util.util_v0 import * ; import _util.util_v0 as util
+import _util.util_v0 as util
 from _util.twodee_v0 import * ; import _util.twodee_v0 as u2d
+import _util.twodee_v0 as u2d
 from _util.pytorch_v0 import * ; import _util.pytorch_v0 as utorch
+import _util.pytorch_v0 as utorch
 from _util.video_v0 import * ; import _util.video_v0 as uvid
+
+import _util.video_v0 as uvid
 
 device = torch.device('cuda')
 
@@ -36,7 +41,7 @@ sbn = [
     tuple(int(f) for f in frs.split('-'))
     for frs in todo
 ]#[:10]
-incl = set([j for i in sbn for j in i])
+incl = {j for i in sbn for j in i}
 excl = set(range(vm['frame_count'])) - incl
 ofns = defaultdict(list)
 for tri in sbn:

@@ -41,10 +41,7 @@ def backwarp(img, flow):
     y = 2*(y/(H-1) - 0.5)
     # stacking X and Y
     grid = torch.stack((x,y), dim=3)
-    # Sample pixels using bilinear interpolation.
-    imgOut = torch.nn.functional.grid_sample(img, grid, align_corners=True)
-
-    return imgOut
+    return torch.nn.functional.grid_sample(img, grid, align_corners=True)
 class ErrorAttention(nn.Module):
     """A three-layer network for predicting mask"""
     def __init__(self, input, output):
@@ -116,11 +113,14 @@ class RFR(nn.Module):
 
             flow_init_resize[:, :1] = flow_init_resize[:, :1].clone() * (W8 // 8 *1.0) / flow_init.size()[3]
             flow_init_resize[:, 1:] = flow_init_resize[:, 1:].clone() * (H8 // 8*1.0) / flow_init.size()[2]
-            
-            if not hasattr(self.args, 'not_use_rfr_mask') or ( hasattr(self.args, 'not_use_rfr_mask') and (not self.args.not_use_rfr_mask)):
+
+            if (
+                not hasattr(self.args, 'not_use_rfr_mask')
+                or not self.args.not_use_rfr_mask
+            ):
                 im18 = F.interpolate(image1, size=(H8//8, W8//8), mode='bilinear')
                 im28 = F.interpolate(image2, size=(H8//8, W8//8), mode='bilinear')
-                
+
                 warp21 = backwarp(im28, flow_init_resize)
                 error21 = torch.sum(torch.abs(warp21 - im18), dim=1, keepdim=True)
                 # print('errormin', error21.min(), error21.max())
@@ -132,22 +132,19 @@ class RFR(nn.Module):
 
             f12_init = flow_init
             # print('None inital flow!')
-        
+
         image1 = F.interpolate(image1, size=(H8, W8), mode='bilinear')
         image2 = F.interpolate(image2, size=(H8, W8), mode='bilinear')
 
         f12s, f12, f12_init = self.forward_pred(image1, image2, iters, flow_init_resize, upsample, test_mode)
-        
- 
+
+
         if (hasattr(self.args, 'requires_sq_flow') and self.args.requires_sq_flow):
             for ii in range(len(f12s)):
                 f12s[ii] = F.interpolate(f12s[ii], size=(H, W), mode='bilinear')
                 f12s[ii][:, :1] = f12s[ii][:, :1].clone() / (1.0*W8) * W
                 f12s[ii][:, 1:] = f12s[ii][:, 1:].clone() / (1.0*H8) * H
-            if self.training:
-                return f12s
-            else:
-                return [f12s[-1]], f12_init
+            return f12s if self.training else ([f12s[-1]], f12_init)
         else:
             f12[:, :1] = f12[:, :1].clone() / (1.0*W8) * W
             f12[:, 1:] = f12[:, 1:].clone() / (1.0*H8) * H
@@ -188,9 +185,8 @@ class RFR(nn.Module):
         flow_predictions = []
         for itr in range(iters):
             coords1 = coords1.detach()
-            if itr == 0:
-                if flow_init is not None:
-                    coords1 = coords1 + flow_init
+            if itr == 0 and flow_init is not None:
+                coords1 = coords1 + flow_init
             corr = corr_fn(coords1) # index correlation volume
 
             flow = coords1 - coords0
@@ -205,7 +201,7 @@ class RFR(nn.Module):
                 flow_up = upflow8(coords1 - coords0)
             else:
                 flow_up = self.upsample_flow(coords1 - coords0, up_mask)
-            
+
             flow_predictions.append(flow_up)
 
 

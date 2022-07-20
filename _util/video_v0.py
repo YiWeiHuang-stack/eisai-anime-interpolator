@@ -12,7 +12,7 @@ from _util.pytorch_v0 import * ; import _util.pytorch_v0 as utorch
 def tvsize(p, ratio=16/9):
     w = p * ratio
     if int(w)!=w or int(p)!=p:
-        warnings.warn(f'non-integer tv size')
+        warnings.warn('non-integer tv size')
     return (int(p), int(w))
 
 
@@ -29,7 +29,7 @@ def video_metadata(fn, cap=None):
     assert os.path.isfile(fn)
     release = cap is None
     if release: cap = cv2.VideoCapture(fn)
-        
+
     # frame count + fps
     frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -39,13 +39,13 @@ def video_metadata(fn, cap=None):
         warnings.warn(f'frame_count={frame_count} not integer')
     fps = int(fps)
     frame_count = int(frame_count)
-    
+
     # size
     size = (
         cap.get(cv2.CAP_PROP_FRAME_HEIGHT),
         cap.get(cv2.CAP_PROP_FRAME_WIDTH),
     )
-    if any([int(s)!=s for s in size]):
+    if any(int(s) != s for s in size):
         warnings.warn(f'size={size} not integer')
     size = tuple(int(s) for s in size)
     shape = (
@@ -124,55 +124,49 @@ class VideoReaderDALISeq:
                 raise StopIteration
 
         @dali.pipeline_def
-        def video_pipe(reader, fn_filelist):
+        def video_pipe(self, fn_filelist):
             params = Namespace(
                 file_list=fn_filelist,
                 file_list_frame_num=True,
-                # filenames=[ifn,],
-                # labels=[0,],  # of filenames
                 enable_frame_num=True,
-                # enable_timestamps=True,
                 device='gpu',
                 name='video_reader',
-
-                sequence_length=reader.bs,  # num frames at a time
-                step=-1,             # -1=seq_len, else step
-                stride=reader.step,  # btwn consecutive frames
-                num_shards=1,        # partition, used for multi-gpu/node
-                channels=reader.shape[1],
+                sequence_length=self.bs,
+                step=-1,
+                stride=self.step,
+                num_shards=1,
+                channels=self.shape[1],
                 dtype={
                     'float': dali.types.DALIDataType.FLOAT,
                     'uint8': dali.types.DALIDataType.UINT8,
-                }[reader.dtype],
-                image_type=dali.types.DALIImageType.RGB,  # RGB, YCbCr
-                pad_last_batch=True,   # across shards, broken
-
-                random_shuffle=False,  # prefetch initial_fill, then select random
-                initial_fill=1024,     # for random_shuffle only
-
-                prefetch_queue_depth=1,  # increase for cpu, gpu=1
-                lazy_init=False,       # parse metadata in constructor
-                normalized=False,      # ?
-                preserve=False,        # prevents removal from graph
-                read_ahead=False,      # amortizes large lmdb/recordio/tfrecord
+                }[self.dtype],
+                image_type=dali.types.DALIImageType.RGB,
+                pad_last_batch=True,
+                random_shuffle=False,
+                initial_fill=1024,
+                prefetch_queue_depth=1,
+                lazy_init=False,
+                normalized=False,
+                preserve=False,
+                read_ahead=False,
                 seed=-1,
-
-                shard_id=0,            # shard index to read?
-                stick_to_shard=False,  # reduces data to cache?
-                skip_vfr_check=False,  # pain in ass, but might malfunction
+                shard_id=0,
+                stick_to_shard=False,
+                skip_vfr_check=False,
             )
+
             read_node = dali.fn.readers.video(
             )
-            if reader.size==reader.size_mp4:
+            if self.size == self.size_mp4:
                 return tuple(dali.fn.readers.video(
                     **vars(params),
                 ))
             else:
-                return tuple(dali.fn.readers.video_resize(
-                    **vars(params),
-                    mode='stretch',
-                    size=reader.size,
-                ))
+                return tuple(
+                    dali.fn.readers.video_resize(
+                        **vars(params), mode='stretch', size=self.size
+                    )
+                )
         def __init__(self, reader):
             self.reader = reader
             return
@@ -277,7 +271,7 @@ class VideoReaderDALIExclusion:
         self.vr = vr
         self.exclude = exclude
         self.bs = bs
-        
+
         # calc all streaks
         curr = []
         streak = [[], [curr,]]
@@ -307,9 +301,11 @@ class VideoReaderDALIExclusion:
             # increment vr batch
             cnt_bs += 1
         # empty tail
-        if len(streaks[-1][0])==0 \
-            and all([len(s)==0 for s in streaks[-1][1]]) \
-            and len(streaks)>=2:
+        if (
+            len(streaks[-1][0]) == 0
+            and all(len(s) == 0 for s in streaks[-1][1])
+            and len(streaks) >= 2
+        ):
             streaks[-2][1].extend(streaks[-1][1])
             streaks = streaks[:-1]
         self.streaks = streaks
@@ -338,24 +334,21 @@ class VideoReaderDALIExclusion:
             # stopping condition, should raise stopiteration
             if self.vr_iter_count==len(self.dupfilter.streaks):
                 return next(self.vr_iter)
-            
+
             # read streaks
             streak = self.dupfilter.streaks[self.vr_iter_count]
             idxs_prev = [s[1] for s in streak[0]]
             idxs_next = [[s[1] for s in ss] for ss in streak[1]]
-            
-            # apply to ans
-            images = []
-            frames = []
-            images.append(self.vr_iter_prev['images'][idxs_prev])
-            frames.append(self.vr_iter_prev['frames'][idxs_prev])
+
+            images = [self.vr_iter_prev['images'][idxs_prev]]
+            frames = [self.vr_iter_prev['frames'][idxs_prev]]
             for idxs in idxs_next:
                 ten = next(self.vr_iter)
                 images_ten = ten['images']#.clone()
                 frames_ten = ten['frames']#.clone()
                 images.append(images_ten[idxs])
                 frames.append(frames_ten[idxs])
-            if len(idxs_next)>0:
+            if idxs_next:
                 self.vr_iter_prev = {
                     'images': images_ten,
                     'frames': frames_ten,
@@ -400,7 +393,7 @@ class VideoReaderCV2:
             return ans.np()
         elif isinstance(idx, list):
             return np.stack([self[i] for i in idx])
-        elif isinstance(idx, slice) or isinstance(idx, range):
+        elif isinstance(idx, (slice, range)):
             a,b,c = idx.start, idx.stop, idx.step
             if a is None: a = 0
             if b is None: b = len(self)
@@ -429,8 +422,7 @@ write_ani = write_animation
 def write_gif(imgs, fn, fps=1, loop=0, disposal=1):
     assert fn.lower().endswith('.gif')
     imgs = [i.pil() for i in imgs]
-    dur = 1000/fps if not isinstance(fps, list) \
-        else [1000/f for f in fps]
+    dur = [1000/f for f in fps] if isinstance(fps, list) else 1000/fps
     return imgs[0].save(
         fn,
         format='GIF',
@@ -457,8 +449,7 @@ def write_webp(
     ):
     assert fn.lower().endswith('.webp')
     imgs = [i.pil() for i in imgs]
-    dur = 1000/fps if not isinstance(fps, list) \
-        else [1000/f for f in fps]
+    dur = [1000/f for f in fps] if isinstance(fps, list) else 1000/fps
     return imgs[0].save(
         fn,
         append_images=imgs[1:],

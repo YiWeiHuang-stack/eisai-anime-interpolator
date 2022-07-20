@@ -79,7 +79,7 @@ def batch_edt(img, block=1024):
                 intermed.data_ptr(),
             ],
         )
-        
+
         # second pass, x-axis
         intermed = intermed.permute(0,2,1).contiguous()
         out = torch.zeros_like(intermed)
@@ -97,7 +97,7 @@ def batch_edt(img, block=1024):
         )
         ans = out.permute(0,2,1).sqrt()
         ans = ans.type(odtype) if odtype!=ans.dtype else ans
-    
+
     # default to scipy cpu implementation
     else:
         sums = img.sum(dim=(1,2))
@@ -124,8 +124,7 @@ def batch_edt(img, block=1024):
 def batch_chamfer_distance(gt, pred, block=1024, return_more=False):
     t = batch_chamfer_distance_t(gt, pred, block=block)
     p = batch_chamfer_distance_p(gt, pred, block=block)
-    cd = (t + p) / 2
-    return cd
+    return (t + p) / 2
 def batch_chamfer_distance_t(gt, pred, block=1024, return_more=False):
     assert gt.device==pred.device and gt.shape==pred.shape
     bs,h,w = gt.shape[0], gt.shape[-2], gt.shape[-1]
